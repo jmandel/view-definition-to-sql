@@ -1,7 +1,93 @@
 # Example output
 
+## Simplified Parse Tree
+```json
+[
+  {
+    "navigation": "Patient",
+    "array": false
+  },
+  {
+    "fn": "where",
+    "args": [
+      [
+        {
+          "fn": "~",
+          "args": [
+            [
+              {
+                "navigation": "text",
+                "array": false
+              }
+            ],
+            [
+              {
+                "literal": "Josh"
+              }
+            ]
+          ]
+        }
+      ]
+    ]
+  },
+  {
+    "navigation": "name",
+    "array": false
+  },
+  {
+    "fn": "where",
+    "args": [
+      [
+        {
+          "context": "$this"
+        },
+        {
+          "navigation": "title",
+          "array": false
+        },
+        {
+          "fn": "substring",
+          "args": [
+            [
+              {
+                "literal": "3"
+              }
+            ],
+            [
+              {
+                "literal": "2"
+              }
+            ],
+            [
+              {
+                "literal": "1"
+              }
+            ]
+          ]
+        },
+        {
+          "fn": "startsWith",
+          "args": [
+            [
+              {
+                "literal": "J"
+              }
+            ]
+          ]
+        }
+      ]
+    ]
+  },
+  {
+    "navigation": "given",
+    "array": false
+  }
+]
 ```
 
+
+## Raw Parse Tree
+```
 {
   "children": [
     {
@@ -438,6 +524,10 @@
     }
   ]
 }
+```
+
+## Debug Output
+```
 Simplifying node of type: undefined
 Simplifying node of type: EntireExpression
 Simplifying node of type: InvocationExpression
@@ -479,85 +569,5 @@ Simplifying node of type: TermExpression
 Simplifying node of type: InvocationTerm
 Simplifying node of type: MemberInvocation
 Simplifying node of type: Identifier
-[
-  {
-    "navigation": "Patient",
-    "array": false
-  },
-  {
-    "fn": "where",
-    "args": [
-      [
-        {
-          "fn": "~",
-          "args": [
-            [
-              {
-                "navigation": "text",
-                "array": false
-              }
-            ],
-            [
-              {
-                "literal": "Josh"
-              }
-            ]
-          ]
-        }
-      ]
-    ]
-  },
-  {
-    "navigation": "name",
-    "array": false
-  },
-  {
-    "fn": "where",
-    "args": [
-      [
-        {
-          "context": "$this"
-        },
-        {
-          "navigation": "title",
-          "array": false
-        },
-        {
-          "fn": "substring",
-          "args": [
-            [
-              {
-                "literal": "3"
-              }
-            ],
-            [
-              {
-                "literal": "2"
-              }
-            ],
-            [
-              {
-                "literal": "1"
-              }
-            ]
-          ]
-        },
-        {
-          "fn": "startsWith",
-          "args": [
-            [
-              {
-                "literal": "J"
-              }
-            ]
-          ]
-        }
-      ]
-    ]
-  },
-  {
-    "navigation": "given",
-    "array": false
-  }
-]
 ```
+

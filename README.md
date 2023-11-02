@@ -1,5 +1,10 @@
 # Example output
 
+Expression: 
+
+    const expr = "Patient.where(text ~ 'Josh').name.where($this.title.substring(3, 2, 1).startsWith('J')).given"
+
+
 ## Simplified Parse Tree
 ```json
 [

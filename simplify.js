@@ -48,7 +48,7 @@ function simplify(node, type = null) {
     case 'FunctionInvocation':
       const functionName = node.children[0].children[0].terminalNodeText[0];
       const args = (node.children[0].children[1]?.children || []).map(param => simplify(param, type));
-      return [{ "fn": functionName, "args": args, type}];
+      return [{ "fn": functionName, "args": args, type: ["where", "first"].includes(functionName) ? type : null}];
     case 'InequalityExpression':
     case 'EqualityExpression':
       const operator = node.terminalNodeText[0];
@@ -81,43 +81,38 @@ function fpparse(q, type) {
 }
 
 const vd = {
-  name: 'patient_demographics',
-  resource: 'Patient',
-  select: [
-    {
-      column: [
-        { path: 'id', name: 'id' },
-        { path: 'gender', name: 'gender' },
-        { path: 'birthDate', name: 'bd' },
-      ],
-    },
-    {
-      select: [
+    "name": "patient_demographics",
+    "resource": "Patient",
+    "select": [
         {
-          column: [
-            {
-              path: "managingOrganization.display",
-              name: 'man',
-            },
-          ],
-        }
-      ],
-    }, {
-      forEach: 'name.given',
-      select: [
+            "column": [
+                {
+                    "path": "getResourceKey()",
+                    "name": "id"
+                },
+                {
+                    "path": "gender",
+                    "name": "gender"
+                }
+            ]
+        },
         {
-          column: [
-            {
-              path: "$this",
-              name: 'given_name',
-              description: 'A single given name field with all names joined together.',
-            },
-          ],
+            "forEach": "name.where(use = 'official').where(text ~ 'J').first()",
+            "column": [
+                {
+                    "path": "given.join(' ')",
+                    "name": "given_name",
+                    "description": "A single given name field with all names joined together."
+                },
+                {
+                    "path": "family",
+                    "name": "family_name"
+                }
+            ]
         }
-      ],
-    },
-  ],
+    ]
 }
+
 function viewDefinitionToAst(viewDefinition) {
   // Initialize the intermediate structure
   const ast = {
@@ -146,7 +141,7 @@ function viewDefinitionToAst(viewDefinition) {
     if (selectBlock.forEach) {
       const path = fpparse(selectBlock.forEach, type || viewDefinition.resource);
       // Determine the new target for the extraction
-      target = "one_" + selectBlock.forEach.replace(".","_");
+      target = "one_" + selectBlock.forEach.replaceAll(/[^A-Za-z]/ig, "_");
       targetType = path.at(-1).type
       // Append to the extractions list in the AST
       ast.extractions.push({
@@ -174,6 +169,59 @@ function viewDefinitionToAst(viewDefinition) {
   return ast;
 }
 
+const flattenFhirpath = (source, target, pathArray) => {
+
+  console.log("PA", pathArray);
+  const ret = []
+
+  let expr = "";
+  for (const [i, p] of pathArray.entries()){
+    if (p.literal) {
+      ret.push({
+        literal: p.literal,
+        source: {},
+        target: {}
+      });
+    }
+    if (p.navigation) {
+      expr += "." + p.navigation;
+      if (p.type?.array){
+        ret.push({
+          source: ret.length === 0 ? source : ret.at(-1).target,
+          target: {table: target + "_segment_" + ret.length, column: "value"},
+          jsonPath: `$${expr}`,
+          restrictions: []
+        })
+        expr = "";
+      }
+    }
+
+    if (p.fn) {
+      const context = ret;
+      let source2 = ret.length === 0 ? source : ret.at(-1).target;
+      const fn = {
+        source: source2,
+        target: {table: source2.table + '_fn_' + p.fn, column: 'value' },
+        jsonPath: expr ? `$${expr}` : undefined,
+        op: p.fn,
+        args: p.args.map(a => flattenFhirpath(source2, target, a || []))
+      }
+      context.push(fn)
+      //context.subquery = flattenFhirpath(source2, target, pathArray.slice(1+i))
+      //break;
+    }
+  }
+
+  if (ret.length) {
+    console.log(ret)
+    ret.at(-1).target.table = target;
+  }
+
+  console.log("Simplified", JSON.stringify(ret, null, 2))
+  return ret;
+
+}
+
 const generateSqlFromAst = (ast) => {
   // Initialize the SQL components
   const sqlSelect = [];
@@ -197,30 +245,11 @@ const generateSqlFromAst = (ast) => {
   ast.extractions.forEach((extraction) => {
     // Construct the SQL JOIN part
     const { sourceCol, path, target } = extraction;
+    console.log(sourceCol, path)
     const source = extraction.source === ast.start ? "P" : extraction.source;
-    const joinGroups = [];
+    const joins = flattenFhirpath({table: source, column: sourceCol}, target, path);
 
-    let j = ""
-    path.forEach(p => {
-      if (p.navigation){
-        j += "."+p.navigation
-      }
-      if (p.type.array) {
-        joinGroups.push(j)
-        j = "";
-      }
-    })
-    j && joinGroups.push(j)
-
-    const joins = joinGroups.map((j, i) => ({
-      source: i === 0 ? source : target + "_segment_" + (i-1),
-      target: i === joinGroups.length-1  ? target : target + "_segment_" + i,
-      sourceCol: i === 0 ? sourceCol : "value",
-      jsonPath: `$${j}`
-    }))
-    console.log(joins)
-
-    sqlJoins.push(...joins.map(j => `json_each(${j.source}.${j.sourceCol}, '${j.jsonPath}') AS ${j.target}`));
+    sqlJoins.push(...joins.map(j => `json_each(${j.source}.${j.sourceCol}, '${j.jsonPath}') AS ${j.target} ${j.where ? `on ${j.target}.${j.where[0].args?.[0]?.[0].navigation} ${j.where[0].fn} ${JSON.stringify(j.where[0]?.args?.[1][0].literal)}`: ""}`));
   });
 
   // Combine all SQL components
@@ -228,8 +257,126 @@ const generateSqlFromAst = (ast) => {
   return sqlQuery;
 };
 
-const o = viewDefinitionToAst(vd)
-console.log(o)
+let counter = {}
+function unique(n){
+  counter[n] = counter[n] ? counter[n]+1 : 0;
+  return n + (counter[n] > 0 ? counter[n] : "")
+};
+function pathToAst(pathArray, parent = null) {
+  const ret = []
+  //let source = parent?.forEach?.source ??  parent?.source;
 
-const p = generateSqlFromAst(o)
-console.log(p)
+  const source = parent?.forEach ? {table: parent?.forEach?.path?.at(-1)?.target?.table} : {table: parent.source?.table};
+  let expr = "";
+  console.log("PA", pathArray);
+  for (const [i, p] of pathArray.entries()){
+    if (p.literal) {
+      ret.push({
+        literal: p.literal,
+        source,
+        target: {}
+      });
+    }
+    if (p.navigation) {
+      expr += "." + p.navigation;
+      if (p.type?.array){
+        ret.push({
+          source: ret.length === 0 ? source : ret.at(-1).target,
+          target: {table: source.table+ "_segment_" + ret.length, column: "value"},
+          jsonPath: `$${expr}`,
+          restrictions: []
+        })
+        expr = "";
+      }
+    }
+
+    if (p.fn) {
+      const context = ret;
+      let source2 = ret.length === 0 ? source : ret.at(-1).target;
+      const fn = {
+        source: source2,
+        target: {table: source2?.table + '_fn_' + p.fn, column: 'value' },
+        jsonPath: expr ? `$${expr}` : undefined,
+        op: p.fn,
+        args: p.args.map(a => pathToAst(a, {source:source2}))
+      }
+      context.push(fn)
+      //context.subquery = flattenFhirpath(source2, target, pathArray.slice(1+i))
+      //break;
+    }
+  }
+
+  if (expr) {
+    ret.push({
+      source: ret.length === 0 ? source : ret.at(-1).target,
+      target: {table:"continued-target"},
+      jsonPath: `$${expr}`
+    })
+
+  }
+
+  console.log("Simplified", JSON.stringify(ret, null, 2))
+  return ret;
+
+}
+function toAst2(viewDefinition) {
+  // Helper function to handle the select block in the ViewDefinition
+  function handleSelect(parent, selectBlock,  type = null) {
+    let targetType = type;
+    if (selectBlock.forEach) {
+      const path = fpparse(selectBlock.forEach, type || viewDefinition.resource);
+      // Determine the new target for the extraction
+      targetType = path.at(-1).type;
+      // Append to the extractions list in the AST
+      parent.forEach = {
+        source: parent.source,
+        path: pathToAst(path, parent),
+      };
+
+      const added = parent.forEach;
+    }
+    // Handle the column in the select block
+    (selectBlock.column || []).forEach(column => {
+      // Extract the path using the fpparse function
+      const path = fpparse(column.path, type || viewDefinition.resource);
+      const source = parent?.forEach ? {table:parent?.forEach?.path?.at(-1)?.target?.table} : {table: parent.source.table};
+      // Append to the selections list in the AST
+      parent.column.push({
+        source: source,
+        path: pathToAst(path, parent),
+        target: {table: unique(source.table+ "_" + column.name), column: column.name}
+      });
+      parent.column.at(-1).path.at(-1).target = parent.column.at(-1).target;
+    });
+    // Handle any nested select blocks inside the forEach block
+    if (selectBlock.select) {
+      selectBlock.select.forEach(nestedSelect => {
+        handleSelect({source: parent.forEach ?? parent.source}, nestedSelect, targetType);
+      });
+    }
+
+    return parent
+  }
+
+
+  let select = viewDefinition.select?.map(selectBlock => 
+    handleSelect({
+    source: {table: viewDefinition.resource, column: 'value'},
+    forEach: null,
+    column: [],
+    select: [],
+  }, selectBlock)
+  );
+
+
+  return {source: viewDefinition.resource, select};
+}
+
+const o = toAst2(vd)
+console.log(JSON.stringify(o, null, 2))
+
+//const p = generateSqlFromAst(o)
+//console.log(p)
+
+
+

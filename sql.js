@@ -117,15 +117,15 @@ export function viewDefinitionToQueryAst(viewDefinition) {
   return blockTemplate
 }
 
-function queryPathItemToSql(p, isForEach) {
-  let prerequisites = (p.args || []).flatMap(a => a.flatMap(queryPathItemToSql));
+function queryPathItemToSql(p, pathType) {
+  let prerequisites = (p.args || []).flatMap(a => a.flatMap(p => queryPathItemToSql(p, pathType)));
 
   if (p.context === "$this") {
     return prerequisites.concat([`${p.target} as (select * from ${p.source})`])
   }
 
   if (p.literal) {
-    return prerequisites.concat([`${p.target} as (select i.sourceKey, i.key, '${p.literal}' as value from ${p.source} i)`])
+    return prerequisites.concat([`${p.target} as (select i.sourceKey, i.key, ${p.literal === true ? 1 : p.literal === false ? 0 : `'${p.literal}'` } as value from ${p.source} i)`])
   }
 
   if (p.op === '~' || p.op === '=') {
@@ -136,22 +136,27 @@ function queryPathItemToSql(p, isForEach) {
   if (p.op === 'exists') {
     const existsTable = p.args[0].at(-1).target;
     return prerequisites.concat(`${p.target}(sourceKey, key, value) as (
-      select  i.sourceKey, i.key, ${p.jsonPath ? `json_extract(i.value, '${p.jsonPath}')` : `i.value`} from ${p.source} i
-      where exists(select 1 from ${existsTable} e where e.key=i.key  and e.value = 1))`)
+      select  i.sourceKey, i.key, 
+      CASE 
+          WHEN o.value IS NOT NULL THEN i.value
+          ELSE NULL
+      END as value
+      from ${p.source} i
+      left join ${existsTable} o on (i.key=o.key ${pathType==='column' ? "and o.value=1)" : ") where o.value=1"})`)
   }
 
   if (p.op === 'where') {
     const whereTable = p.args[0].at(-1).target;
     return prerequisites.concat(`${p.target}(sourceKey, key, value) as (
       select  i.* from ${p.source} i
-      left join ${whereTable} o on i.key=o.key where o.value=1)`)
+      left join ${whereTable} o on (i.key=o.key ${pathType==='column' ? "and o.value=1)" : ") where o.value=1"})`)
   }
 
   // TODO Lots more ops
 
   // Default case: a simple navigation step
   let key, sourceKey;
-  if (p.forEachAnchor && isForEach) {
+  if (p.forEachAnchor && pathType==='forEach') {
     sourceKey = p.source.includes('_') ? `i.key` : `json_extract(i.value, '$.id') `
   } else {
     sourceKey = p.source.includes('_') ? "i.sourceKey" : `json_extract(i.value, '$.id') `
@@ -182,12 +187,12 @@ export function queryAstToSql(ast) {
   if (ast.forEach) {
     ctes.push(
       ...ast.forEach.path
-        .flatMap((p, i) => queryPathItemToSql(p, true))
+        .flatMap((p, i) => queryPathItemToSql(p, 'forEach'))
     )
   }
 
   for (const c of ast.column ?? []) {
-    ctes.push(...c.path.flatMap(queryPathItemToSql))
+    ctes.push(...c.path.flatMap(p => queryPathItemToSql(p, 'column')))
   }
 
   for (const s of ast.select ?? []) {

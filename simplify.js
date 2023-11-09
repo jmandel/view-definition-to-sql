@@ -51,7 +51,15 @@ export function simplifyFhirpath(node, type = null) {
       return [{ fn: operator, args: [leftOperand, rightOperand] }]
     case 'LiteralTerm':
       const literalValue = node.children[0].terminalNodeText[0].replace(/'/g, '')
-      return [{ literal: literalValue }]
+      switch (node.children[0].type) {
+        case 'StringLiteral':
+          return [{ literal: literalValue }]
+        case 'NumberLiteral':
+          return [{ literal: parseFloat(literalValue) }]
+        case 'BooleanLiteral':
+          return [{ literal: literalValue === 'true' }]
+      }
+      console.log("LV", node.children[0])
     case 'ThisInvocation':
       return [{ context: '$this', type}]
     default:

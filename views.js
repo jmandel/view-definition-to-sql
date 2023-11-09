@@ -24,18 +24,11 @@ const vd1 = {
           name: 'patient_family_name',
         },
       ],
-      select: [{
-        forEach: "given",
-        column: [{
-          path: '$this',
-          name: 'patient_given'
-        }]
-      }]
     }, {
-      forEach: "contact.where(name.text='Bob Bogart')",
+      forEach: "contact",
       column: [
         {
-          path: 'name.family',
+          path: "name.family",
           name: 'contact_family_name',
         },
       ],

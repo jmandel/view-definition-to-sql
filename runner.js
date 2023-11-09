@@ -1,10 +1,6 @@
 import  * as sqlgen from './sql.js'
 import {vd1} from "./views.js"
 const o = sqlgen.viewDefinitionToQueryAst(vd1)
-console.log("--------View Definition---------\n")
-console.log(JSON.stringify(vd1, null, 2))
-console.log("--------AST---------\n")
-console.log(JSON.stringify(o, null, 2))
 const q = sqlgen.queryAstToSql(o)
 
 import { Database } from "bun:sqlite";
@@ -18,24 +14,32 @@ CREATE TABLE Patient (
 );
 `);
 
-db.run(`
-INSERT INTO Patient (id, value) VALUES ('123', '
-{
+const patients = [{
   "resourceType": "Patient",
   "id": "1",
   "name": [
     {"text": "Alice Adams", "given": ["A1", "A2", "A3"], "family": "Adams"},
-    {"text": "Azure Azams", "given": ["A4", "A5"], "family": "A", "use": "preferred"},
-    {"text": "Ayure Ayams", "given": ["A6", "A7"], "family": "Ayams"}
+    {"text": "Azure Azams", "given": ["A4", "A5"], "family": "A", "use": "preferred"}
   ],
   "contact":[{
-    "name": {"text": "Alice Bogart", "given": ["Bob", "B"], "family": "Wrong"}
-  },{
-    "name": {"text": "Bob Bogart", "given": ["Bob", "B"], "family": "Bogart"}
-  },{
     "name": {"text": "Bob Bogart", "given": ["Bob2", "B2"], "family": "Bogart2"}
+  },{
+    "name": {"text": "Tom Bogart", "given": ["Tom", "T"], "family": "Bogart"}
   }]
-}')`);
+}]
+
+for (const p of patients) {
+  db.run(`
+    INSERT INTO Patient (id, value) VALUES ('${p.id}', '${JSON.stringify(p)}')`);
+}
+
+console.log("--------Data---------\n")
+console.log(JSON.stringify(patients, null, 2))
+console.log("--------View Definition---------\n")
+console.log(JSON.stringify(vd1, null, 2))
+console.log("--------AST---------\n")
+console.log(JSON.stringify(o, null, 2))
+
 
 // const query = db.query("select json_extract(value, '$.resourceType') rt from Patient");
 // const result = query.all(); // => { message: "Hello world" }

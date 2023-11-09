@@ -1,3 +1,53 @@
+--------Data---------
+
+[
+  {
+    "resourceType": "Patient",
+    "id": "1",
+    "name": [
+      {
+        "text": "Alice Adams",
+        "given": [
+          "A1",
+          "A2",
+          "A3"
+        ],
+        "family": "Adams"
+      },
+      {
+        "text": "Azure Azams",
+        "given": [
+          "A4",
+          "A5"
+        ],
+        "family": "A",
+        "use": "preferred"
+      }
+    ],
+    "contact": [
+      {
+        "name": {
+          "text": "Bob Bogart",
+          "given": [
+            "Bob2",
+            "B2"
+          ],
+          "family": "Bogart2"
+        }
+      },
+      {
+        "name": {
+          "text": "Tom Bogart",
+          "given": [
+            "Tom",
+            "T"
+          ],
+          "family": "Bogart"
+        }
+      }
+    ]
+  }
+]
 --------View Definition---------
 
 {
@@ -11,21 +61,10 @@
           "path": "family",
           "name": "patient_family_name"
         }
-      ],
-      "select": [
-        {
-          "forEach": "given",
-          "column": [
-            {
-              "path": "$this",
-              "name": "patient_given"
-            }
-          ]
-        }
       ]
     },
     {
-      "forEach": "contact.where(name.text='Bob Bogart')",
+      "forEach": "contact",
       "column": [
         {
           "path": "name.family",
@@ -57,42 +96,7 @@
           "target": "r_s0_col0_part0"
         }
       ],
-      "select": [
-        {
-          "column": [
-            {
-              "name": "patient_given",
-              "source": "r_s0_s0_each",
-              "path": [
-                {
-                  "context": "$this",
-                  "source": "r_s0_s0_each",
-                  "target": "r_s0_s0_col0_part0",
-                  "type": "hl7.fhir.r4.core#4.0.1/string"
-                }
-              ],
-              "target": "r_s0_s0_col0_part0"
-            }
-          ],
-          "select": [],
-          "source": "r_s0_each",
-          "target": "r_s0_s0",
-          "forEach": {
-            "target": "r_s0_s0_each",
-            "source": "r_s0_each",
-            "path": [
-              {
-                "source": "r_s0_each",
-                "target": "r_s0_s0_each",
-                "jsonPath": "$.given",
-                "array": true,
-                "forEachAnchor": true,
-                "type": "hl7.fhir.r4.core#4.0.1/string"
-              }
-            ]
-          }
-        }
-      ],
+      "select": [],
       "source": "Patient",
       "target": "r_s0",
       "forEach": {
@@ -143,51 +147,11 @@
         "path": [
           {
             "source": "Patient",
-            "target": "Patient_r_s1_each_part0",
+            "target": "r_s1_each",
             "jsonPath": "$.contact",
             "array": true,
             "forEachAnchor": true,
             "type": "hl7.fhir.r4.core#4.0.1/BackboneElement"
-          },
-          {
-            "source": "Patient_r_s1_each_part0",
-            "target": "r_s1_each",
-            "type": "hl7.fhir.r4.core#4.0.1/BackboneElement",
-            "op": "where",
-            "args": [
-              [
-                {
-                  "source": "Patient_r_s1_each_part0",
-                  "target": "Patient_r_s1_each_part0_where_arg0_part0",
-                  "op": "=",
-                  "args": [
-                    [
-                      {
-                        "source": "Patient_r_s1_each_part0",
-                        "target": "Patient_r_s1_each_part0_EQ_arg0_part0",
-                        "jsonPath": "$.name",
-                        "forEachAnchor": true,
-                        "type": "hl7.fhir.r4.core#4.0.1/HumanName"
-                      },
-                      {
-                        "source": "Patient_r_s1_each_part0_EQ_arg0_part0",
-                        "target": "Patient_r_s1_each_part0_EQ_arg0_part0_EQ_arg0_part1",
-                        "jsonPath": "$.text",
-                        "forEachAnchor": false,
-                        "type": "hl7.fhir.r4.core#4.0.1/string"
-                      }
-                    ],
-                    [
-                      {
-                        "literal": "Bob Bogart",
-                        "source": "Patient_r_s1_each_part0",
-                        "target": "Patient_r_s1_each_part0_EQ_arg1_part0"
-                      }
-                    ]
-                  ]
-                }
-              ]
-            ]
           }
         ]
       }
@@ -207,38 +171,13 @@ r_s0_col0_part0(sourceKey, key, value) as (select
     i.key as key,
    json_extract(i.value, '$.family') from r_s0_each i 
 ),
-r_s0_s0_each(sourceKey, key, value) as (select
-    i.key as sourceKey,
-    i.key || '_' || o.fullkey  as key,
-   o.value from r_s0_each i join json_each(i.value, '$.given') o
-),
-r_s0_s0_col0_part0 as (select * from r_s0_s0_each),
-r_s0_s0 as (select t0.sourceKey as key, t0.sourceKey as sourceKey, t0.value as patient_given from 
-    r_s0_s0_col0_part0 t0),
-r_s0 as (select t0.sourceKey as key, t0.sourceKey as sourceKey, t0.value as patient_family_name, t1.patient_given as patient_given from 
-    r_s0_col0_part0 t0
-    join r_s0_s0 t1 on (t0.key=t1.key)),
-Patient_r_s1_each_part0(sourceKey, key, value) as (select
+r_s0 as (select t0.sourceKey as key, t0.sourceKey as sourceKey, t0.value as patient_family_name from 
+    r_s0_col0_part0 t0),
+r_s1_each(sourceKey, key, value) as (select
     json_extract(i.value, '$.id')  as sourceKey,
     json_extract(i.value, '$.id') || '_' || o.fullkey  as key,
    o.value from Patient i join json_each(i.value, '$.contact') o
 ),
-Patient_r_s1_each_part0_EQ_arg0_part0(sourceKey, key, value) as (select
-    i.sourceKey as sourceKey,
-    i.key as key,
-   json_extract(i.value, '$.name') from Patient_r_s1_each_part0 i 
-),
-Patient_r_s1_each_part0_EQ_arg0_part0_EQ_arg0_part1(sourceKey, key, value) as (select
-    i.sourceKey as sourceKey,
-    i.key as key,
-   json_extract(i.value, '$.text') from Patient_r_s1_each_part0_EQ_arg0_part0 i 
-),
-Patient_r_s1_each_part0_EQ_arg1_part0 as (select i.sourceKey, i.key, 'Bob Bogart' as value from Patient_r_s1_each_part0 i),
-Patient_r_s1_each_part0_where_arg0_part0 as (select i.sourceKey, i.key, (i.value=o.value) as value
-      from Patient_r_s1_each_part0_EQ_arg0_part0_EQ_arg0_part1 i join Patient_r_s1_each_part0_EQ_arg1_part0 o on (i.key=o.key)),
-r_s1_each(sourceKey, key, value) as (
-      select  i.* from Patient_r_s1_each_part0 i
-      left join Patient_r_s1_each_part0_where_arg0_part0 o on i.key=o.key where o.value=1),
 r_s1_col0_part0(sourceKey, key, value) as (select
     i.sourceKey as sourceKey,
     i.key as key,
@@ -251,7 +190,7 @@ r_s1_col0_part1(sourceKey, key, value) as (select
 ),
 r_s1 as (select t0.sourceKey as key, t0.sourceKey as sourceKey, t0.value as contact_family_name from 
     r_s1_col0_part1 t0),
-r as (select t0.sourceKey as key, t0.sourceKey as sourceKey, t0.patient_family_name as patient_family_name, t0.patient_given as patient_given, t1.contact_family_name as contact_family_name from 
+r as (select t0.sourceKey as key, t0.sourceKey as sourceKey, t0.patient_family_name as patient_family_name, t1.contact_family_name as contact_family_name from 
     r_s0 t0
     join r_s1 t1 on (t0.key=t1.key))
 
@@ -267,11 +206,6 @@ select * from r
     sourceKey: "1",
     key: "1_$.name[1]",
     value: "{\"text\":\"Azure Azams\",\"given\":[\"A4\",\"A5\"],\"family\":\"A\",\"use\":\"preferred\"}"
-  },
-  {
-    sourceKey: "1",
-    key: "1_$.name[2]",
-    value: "{\"text\":\"Ayure Ayams\",\"given\":[\"A6\",\"A7\"],\"family\":\"Ayams\"}"
   }
 ]
 ----
@@ -285,109 +219,6 @@ select * from r
     sourceKey: "1",
     key: "1_$.name[1]",
     value: "A"
-  }, {
-    sourceKey: "1",
-    key: "1_$.name[2]",
-    value: "Ayams"
-  }
-]
-----
-## r_s0_s0_each
-[
-  {
-    sourceKey: "1_$.name[0]",
-    key: "1_$.name[0]_$.given[0]",
-    value: "A1"
-  }, {
-    sourceKey: "1_$.name[0]",
-    key: "1_$.name[0]_$.given[1]",
-    value: "A2"
-  }, {
-    sourceKey: "1_$.name[0]",
-    key: "1_$.name[0]_$.given[2]",
-    value: "A3"
-  }, {
-    sourceKey: "1_$.name[1]",
-    key: "1_$.name[1]_$.given[0]",
-    value: "A4"
-  }, {
-    sourceKey: "1_$.name[1]",
-    key: "1_$.name[1]_$.given[1]",
-    value: "A5"
-  }, {
-    sourceKey: "1_$.name[2]",
-    key: "1_$.name[2]_$.given[0]",
-    value: "A6"
-  }, {
-    sourceKey: "1_$.name[2]",
-    key: "1_$.name[2]_$.given[1]",
-    value: "A7"
-  }
-]
-----
-## r_s0_s0_col0_part0
-[
-  {
-    sourceKey: "1_$.name[0]",
-    key: "1_$.name[0]_$.given[0]",
-    value: "A1"
-  }, {
-    sourceKey: "1_$.name[0]",
-    key: "1_$.name[0]_$.given[1]",
-    value: "A2"
-  }, {
-    sourceKey: "1_$.name[0]",
-    key: "1_$.name[0]_$.given[2]",
-    value: "A3"
-  }, {
-    sourceKey: "1_$.name[1]",
-    key: "1_$.name[1]_$.given[0]",
-    value: "A4"
-  }, {
-    sourceKey: "1_$.name[1]",
-    key: "1_$.name[1]_$.given[1]",
-    value: "A5"
-  }, {
-    sourceKey: "1_$.name[2]",
-    key: "1_$.name[2]_$.given[0]",
-    value: "A6"
-  }, {
-    sourceKey: "1_$.name[2]",
-    key: "1_$.name[2]_$.given[1]",
-    value: "A7"
-  }
-]
-----
-## r_s0_s0
-[
-  {
-    key: "1_$.name[0]",
-    sourceKey: "1_$.name[0]",
-    patient_given: "A1"
-  }, {
-    key: "1_$.name[0]",
-    sourceKey: "1_$.name[0]",
-    patient_given: "A2"
-  }, {
-    key: "1_$.name[0]",
-    sourceKey: "1_$.name[0]",
-    patient_given: "A3"
-  }, {
-    key: "1_$.name[1]",
-    sourceKey: "1_$.name[1]",
-    patient_given: "A4"
-  }, {
-    key: "1_$.name[1]",
-    sourceKey: "1_$.name[1]",
-    patient_given: "A5"
-  }, {
-    key: "1_$.name[2]",
-    sourceKey: "1_$.name[2]",
-    patient_given: "A6"
-  }, {
-    key: "1_$.name[2]",
-    sourceKey: "1_$.name[2]",
-    patient_given: "A7"
   }
 ]
 ----
@@ -396,124 +227,11 @@ select * from r
   {
     key: "1",
     sourceKey: "1",
-    patient_family_name: "Adams",
-    patient_given: "A1"
+    patient_family_name: "Adams"
   }, {
     key: "1",
     sourceKey: "1",
-    patient_family_name: "Adams",
-    patient_given: "A2"
-  }, {
-    key: "1",
-    sourceKey: "1",
-    patient_family_name: "Adams",
-    patient_given: "A3"
-  }, {
-    key: "1",
-    sourceKey: "1",
-    patient_family_name: "A",
-    patient_given: "A4"
-  }, {
-    key: "1",
-    sourceKey: "1",
-    patient_family_name: "A",
-    patient_given: "A5"
-  }, {
-    key: "1",
-    sourceKey: "1",
-    patient_family_name: "Ayams",
-    patient_given: "A6"
-  }, {
-    key: "1",
-    sourceKey: "1",
-    patient_family_name: "Ayams",
-    patient_given: "A7"
-  }
-]
-----
-## Patient_r_s1_each_part0
-[
-  {
-    sourceKey: "1",
-    key: "1_$.contact[0]",
-    value: "{\"name\":{\"text\":\"Alice Bogart\",\"given\":[\"Bob\",\"B\"],\"family\":\"Wrong\"}}"
-  },
-  {
-    sourceKey: "1",
-    key: "1_$.contact[1]",
-    value: "{\"name\":{\"text\":\"Bob Bogart\",\"given\":[\"Bob\",\"B\"],\"family\":\"Bogart\"}}"
-  }, {
-    sourceKey: "1",
-    key: "1_$.contact[2]",
-    value: "{\"name\":{\"text\":\"Bob Bogart\",\"given\":[\"Bob2\",\"B2\"],\"family\":\"Bogart2\"}}"
-  }
-]
-----
-## Patient_r_s1_each_part0_EQ_arg0_part0
-[
-  {
-    sourceKey: "1",
-    key: "1_$.contact[0]",
-    value: "{\"text\":\"Alice Bogart\",\"given\":[\"Bob\",\"B\"],\"family\":\"Wrong\"}"
-  }, {
-    sourceKey: "1",
-    key: "1_$.contact[1]",
-    value: "{\"text\":\"Bob Bogart\",\"given\":[\"Bob\",\"B\"],\"family\":\"Bogart\"}"
-  }, {
-    sourceKey: "1",
-    key: "1_$.contact[2]",
-    value: "{\"text\":\"Bob Bogart\",\"given\":[\"Bob2\",\"B2\"],\"family\":\"Bogart2\"}"
-  }
-]
-----
-## Patient_r_s1_each_part0_EQ_arg0_part0_EQ_arg0_part1
-[
-  {
-    sourceKey: "1",
-    key: "1_$.contact[0]",
-    value: "Alice Bogart"
-  }, {
-    sourceKey: "1",
-    key: "1_$.contact[1]",
-    value: "Bob Bogart"
-  }, {
-    sourceKey: "1",
-    key: "1_$.contact[2]",
-    value: "Bob Bogart"
-  }
-]
-----
-## Patient_r_s1_each_part0_EQ_arg1_part0
-[
-  {
-    sourceKey: "1",
-    key: "1_$.contact[0]",
-    value: "Bob Bogart"
-  }, {
-    sourceKey: "1",
-    key: "1_$.contact[1]",
-    value: "Bob Bogart"
-  }, {
-    sourceKey: "1",
-    key: "1_$.contact[2]",
-    value: "Bob Bogart"
-  }
-]
-----
-## Patient_r_s1_each_part0_where_arg0_part0
-[
-  {
-    sourceKey: "1",
-    key: "1_$.contact[0]",
-    value: 0
-  }, {
-    sourceKey: "1",
-    key: "1_$.contact[1]",
-    value: 1
-  }, {
-    sourceKey: "1",
-    key: "1_$.contact[2]",
-    value: 1
+    patient_family_name: "A"
   }
 ]
 ----
@@ -521,12 +239,13 @@ select * from r
 [
   {
     sourceKey: "1",
-    key: "1_$.contact[1]",
-    value: "{\"name\":{\"text\":\"Bob Bogart\",\"given\":[\"Bob\",\"B\"],\"family\":\"Bogart\"}}"
-  }, {
-    sourceKey: "1",
-    key: "1_$.contact[2]",
+    key: "1_$.contact[0]",
     value: "{\"name\":{\"text\":\"Bob Bogart\",\"given\":[\"Bob2\",\"B2\"],\"family\":\"Bogart2\"}}"
+  },
+  {
+    sourceKey: "1",
+    key: "1_$.contact[1]",
+    value: "{\"name\":{\"text\":\"Tom Bogart\",\"given\":[\"Tom\",\"T\"],\"family\":\"Bogart\"}}"
   }
 ]
 ----
@@ -534,12 +253,12 @@ select * from r
 [
   {
     sourceKey: "1",
-    key: "1_$.contact[1]",
-    value: "{\"text\":\"Bob Bogart\",\"given\":[\"Bob\",\"B\"],\"family\":\"Bogart\"}"
+    key: "1_$.contact[0]",
+    value: "{\"text\":\"Bob Bogart\",\"given\":[\"Bob2\",\"B2\"],\"family\":\"Bogart2\"}"
   }, {
     sourceKey: "1",
-    key: "1_$.contact[2]",
-    value: "{\"text\":\"Bob Bogart\",\"given\":[\"Bob2\",\"B2\"],\"family\":\"Bogart2\"}"
+    key: "1_$.contact[1]",
+    value: "{\"text\":\"Tom Bogart\",\"given\":[\"Tom\",\"T\"],\"family\":\"Bogart\"}"
   }
 ]
 ----
@@ -547,12 +266,12 @@ select * from r
 [
   {
     sourceKey: "1",
-    key: "1_$.contact[1]",
-    value: "Bogart"
+    key: "1_$.contact[0]",
+    value: "Bogart2"
   }, {
     sourceKey: "1",
-    key: "1_$.contact[2]",
-    value: "Bogart2"
+    key: "1_$.contact[1]",
+    value: "Bogart"
   }
 ]
 ----
@@ -561,11 +280,11 @@ select * from r
   {
     key: "1",
     sourceKey: "1",
-    contact_family_name: "Bogart"
+    contact_family_name: "Bogart2"
   }, {
     key: "1",
     sourceKey: "1",
-    contact_family_name: "Bogart2"
+    contact_family_name: "Bogart"
   }
 ]
 ----
@@ -575,85 +294,21 @@ select * from r
     key: "1",
     sourceKey: "1",
     patient_family_name: "Adams",
-    patient_given: "A1",
-    contact_family_name: "Bogart"
+    contact_family_name: "Bogart2"
   }, {
     key: "1",
     sourceKey: "1",
     patient_family_name: "Adams",
-    patient_given: "A2",
-    contact_family_name: "Bogart"
-  }, {
-    key: "1",
-    sourceKey: "1",
-    patient_family_name: "Adams",
-    patient_given: "A3",
     contact_family_name: "Bogart"
   }, {
     key: "1",
     sourceKey: "1",
     patient_family_name: "A",
-    patient_given: "A4",
-    contact_family_name: "Bogart"
-  }, {
-    key: "1",
-    sourceKey: "1",
-    patient_family_name: "A",
-    patient_given: "A5",
-    contact_family_name: "Bogart"
-  }, {
-    key: "1",
-    sourceKey: "1",
-    patient_family_name: "Ayams",
-    patient_given: "A6",
-    contact_family_name: "Bogart"
-  }, {
-    key: "1",
-    sourceKey: "1",
-    patient_family_name: "Ayams",
-    patient_given: "A7",
-    contact_family_name: "Bogart"
-  }, {
-    key: "1",
-    sourceKey: "1",
-    patient_family_name: "Adams",
-    patient_given: "A1",
-    contact_family_name: "Bogart2"
-  }, {
-    key: "1",
-    sourceKey: "1",
-    patient_family_name: "Adams",
-    patient_given: "A2",
-    contact_family_name: "Bogart2"
-  }, {
-    key: "1",
-    sourceKey: "1",
-    patient_family_name: "Adams",
-    patient_given: "A3",
     contact_family_name: "Bogart2"
   }, {
     key: "1",
     sourceKey: "1",
     patient_family_name: "A",
-    patient_given: "A4",
-    contact_family_name: "Bogart2"
-  }, {
-    key: "1",
-    sourceKey: "1",
-    patient_family_name: "A",
-    patient_given: "A5",
-    contact_family_name: "Bogart2"
-  }, {
-    key: "1",
-    sourceKey: "1",
-    patient_family_name: "Ayams",
-    patient_given: "A6",
-    contact_family_name: "Bogart2"
-  }, {
-    key: "1",
-    sourceKey: "1",
-    patient_family_name: "Ayams",
-    patient_given: "A7",
-    contact_family_name: "Bogart2"
+    contact_family_name: "Bogart"
   }
 ]

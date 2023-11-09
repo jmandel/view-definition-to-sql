@@ -24,6 +24,7 @@ function pathToAst(pathArray, parent = null, nameHint = "p") {
 
   const incomingSource = parent?.forEach ? parent?.forEach?.path?.at(-1)?.source : parent.source
   // const target = parent?.forEach ? parent?.forEach?.path?.at(-1)?.target : parent.target
+  let haveAnchoredForEach = false; 
   let expr = ''
   let target
   let source
@@ -46,16 +47,16 @@ function pathToAst(pathArray, parent = null, nameHint = "p") {
     }
     if (p.navigation) {
       expr += '.' + p.navigation
-      if (p.type?.array) {
         ret.push({
           source,
           target,
           jsonPath: `$${expr}`,
-          array: true,
+          array: p?.type.array,
+          forEachAnchor: !haveAnchoredForEach,
           type: p.type.type
         })
-        expr = ''
-      }
+      haveAnchoredForEach = true;
+      expr = ''
     }
 
     if (p.fn) {
@@ -87,7 +88,7 @@ function pathToAst(pathArray, parent = null, nameHint = "p") {
   return ret
 }
 
-function viewDefinitionToQueryAst(viewDefinition) {
+export function viewDefinitionToQueryAst(viewDefinition) {
   const blockTemplateEmpty = () => ({ column: [], select: [] })
 
   // TODO: make this return ASTs rather than mutating them
@@ -101,7 +102,6 @@ function viewDefinitionToQueryAst(viewDefinition) {
         source: parent.source,
         path: pathToAst(path, parent, parent.target.table+"_each"),
       }
-      // parent.forEach.target = parent.forEach.path.at(-1).target
       parent.forEach.path.at(-1).target = parent.forEach.target 
     }
 
@@ -159,8 +159,8 @@ function queryPathItemToSql(p, isForEach) {
   if (p.op === 'exists') {
     const existsTable = p.args[0].at(-1).target.table;
     return prerequisites.concat(`${p.target.table}(sourceKey, key, value) as (
-      select  i.* from ${p.source.table} i
-      where exists(select 1 from ${existsTable} e where e.sourceKey=i.key  and e.value = 1)
+      select  i.sourceKey, i.key, ${p.jsonPath ? `json_extract(i.value, '${p.jsonPath}')` : `i.value`} from ${p.source.table} i
+      where exists(select 1 from ${existsTable} e where e.key=i.key  and e.value = 1)
     )`)
   }
 
@@ -169,21 +169,25 @@ function queryPathItemToSql(p, isForEach) {
     return prerequisites.concat(`
      ${p.target.table}(sourceKey, key, value) as (
       select  i.* from ${p.source.table} i
-      join ${whereTable} o on i.key=o.key where o.value=1)`)
+      join ${whereTable} o on i.key=o.sourceKey)`)
   }
 
   let key, sourceKey;
-  if (isForEach && p.array) {
-    sourceKey = p.source.table.includes('_') ? `i.sourceKey` : `json_extract(i.${p.source.column}, '$.id')`
-    key = (p.source.table.includes('_') ? `i.key` : `json_extract(i.${p.source.column}, '$.id')`)   + ` || '_' || o.path `;
+  if (p.forEachAnchor) {
+    sourceKey = p.source.table.includes('_') ? `i.key` : `json_extract(i.${p.source.column}, '$.id')`
+  } else {
+    sourceKey = p.source.table.includes('_') ? "i.sourceKey" : `json_extract(i.${p.source.column}, '$.id')`
+  }
+
+  if (p.array) {
+    key = (p.source.table.includes('_') ? `i.key` : `json_extract(i.${p.source.column}, '$.id')`)   + ` || '_' || o.fullkey `;
   } else {
     key = "i.key"
-    sourceKey = "i.sourceKey"
   }
 
   let ret = `${p.target?.table}(sourceKey, key, value) as (select\n    ${sourceKey} as sourceKey,\n    ${key} as key,\n    `
   if (p.jsonPath && !p.array) {
-    ret += `json_extract(i.value, '${p.jsonPath}') `
+    ret += `json_extract(i.value, '${p.jsonPath}')`
   } else {
     ret += `o.value `
   }
@@ -195,7 +199,7 @@ function queryPathItemToSql(p, isForEach) {
   return prerequisites.concat([ret])
 }
 
-function queryAstToSql(ast) {
+export function queryAstToSql(ast) {
   const ctes = []
   if (ast.forEach) {
     ctes.push(
@@ -212,19 +216,32 @@ function queryAstToSql(ast) {
     ctes.push(...queryAstToSql(s))
   }
 
-  const completeSelectSources =  (ast.select || []).concat(ast.column || [])
-  let completeSelect = `\n    ${completeSelectSources[0].target.table} t0`
-  for (let i = 1; i < completeSelectSources.length; i++) {
-    completeSelect += `\n    join ${completeSelectSources[i].target.table} t${i} on (t${i-1}.key=t${i}.key)`
+  function walkColumns(s) {
+    return (s.column || []).concat((s.select || []).flatMap(walkColumns))
   }
-  ctes.push(
-    `${ast?.target?.table} as (select * from ${completeSelect})`,
+  const columns = []
+  const joins = []
+  for (const c of ast.column || []) {
+    const tnum = joins.length;
+    joins.push([`${c.target.table}`, tnum])
+    columns.push(`t${tnum}.value as ${c.name}`)
+  }
+  for (const s of ast.select || []) {
+    const tnum = joins.length;
+    joins.push([`${s.target.table}`, tnum])
+    for (const c of walkColumns(s)) {
+      columns.push(`t${tnum}.${c.name} as ${c.name}`)
+    }
+  }
+
+  let [t0, i0] = joins[0];
+  let completeSelect = `\n    ${t0} t${i0}`
+  for (const [t, i] of joins.slice(1)) {
+    completeSelect += `\n    join ${t} t${i} on (t${i-1}.key=t${i}.key)`
+  }
+
+  ctes.push( 
+    `${ast?.target?.table} as (select t0.sourceKey as key, t0.sourceKey as sourceKey, ${columns.join(", ")} from ${completeSelect})`,
   )
   return ctes
 }
-
-import {vd1} from "./views"
-const o = viewDefinitionToQueryAst(vd1)
-console.log(JSON.stringify(o, null, 2))
-const q = queryAstToSql(o)
-console.log(q.join(',\n'))

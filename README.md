@@ -1,3 +1,7 @@
+# Dev mode
+
+    bun run --watch runner.js
+
 # Example output
 
 Expression: 

@@ -2,28 +2,15 @@ const vd1 = {
   name: 'patient_demographics',
   resource: 'Patient',
   select: [
-    {
+   {
+      forEach: "name.where(family.exists($this = 'A'))",
       column: [
         {
-          path: "name.given.where($this > 4)",
-          name: 'patient_j_name',
+          path: "family",
+          name: 'patient_family_name',
         },
-      {
-          path: 'family2',
-          name: 'contact_family_name',
-        }
       ],
-      select: [{
-        column: [{
-          path: "'inside_val'",
-          name: 'inside'
-        },{
-          path: 'family3',
-          name: 'contact_family_name',
-        }]
-
-      }]
-    }
+    }, 
   ],
 }
 const vd3 = {

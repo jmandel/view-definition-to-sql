@@ -86,7 +86,6 @@ export function viewDefinitionToQueryAst(viewDefinition) {
     const source = parent?.forEach ? parent?.forEach?.path?.at(-1)?.target : parent.source
     ;(selectBlock.column || []).forEach((column, i) => {
       const path = fpparse(column.path, targetType)
-      console.log("Checking cou", column.name, targetType, path)
       // Append to the selections list in the AST
       parent.column.push({
         name: column.name,
@@ -145,7 +144,7 @@ function queryPathItemToSql(p, isForEach) {
     const whereTable = p.args[0].at(-1).target;
     return prerequisites.concat(`${p.target}(sourceKey, key, value) as (
       select  i.* from ${p.source} i
-      left join ${whereTable} o on i.key=o.sourceKey)`)
+      left join ${whereTable} o on i.key=o.key where o.value=1)`)
   }
 
   // TODO Lots more ops

@@ -1,6 +1,9 @@
 import  * as sqlgen from './sql.js'
 import {vd1} from "./views.js"
 const o = sqlgen.viewDefinitionToQueryAst(vd1)
+console.log("--------View Definition---------\n")
+console.log(JSON.stringify(vd1, null, 2))
+console.log("--------AST---------\n")
 console.log(JSON.stringify(o, null, 2))
 const q = sqlgen.queryAstToSql(o)
 
@@ -21,13 +24,16 @@ INSERT INTO Patient (id, value) VALUES ('123', '
   "resourceType": "Patient",
   "id": "1",
   "name": [
-    {"text": "Alice Adams", "given": ["Alice", "A", "AA"], "family": "Adams"},
-    {"text": "Azure Azams", "given": ["Azure", "A"], "family": "A", "use": "preferred"},
-    {"text": "Ayure Ayams", "given": ["Ayure", "A"], "family": "Ayams"}
+    {"text": "Alice Adams", "given": ["A1", "A2", "A3"], "family": "Adams"},
+    {"text": "Azure Azams", "given": ["A4", "A5"], "family": "A", "use": "preferred"},
+    {"text": "Ayure Ayams", "given": ["A6", "A7"], "family": "Ayams"}
   ],
   "contact":[{
-    "name": {"text": "Bob Bogart", "given": ["Bob", "B"], "family": "Bogart"},
+    "name": {"text": "Alice Bogart", "given": ["Bob", "B"], "family": "Wrong"}
+  },{
     "name": {"text": "Bob Bogart", "given": ["Bob", "B"], "family": "Bogart"}
+  },{
+    "name": {"text": "Bob Bogart", "given": ["Bob2", "B2"], "family": "Bogart2"}
   }]
 }')`);
 

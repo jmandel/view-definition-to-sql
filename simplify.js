@@ -53,7 +53,7 @@ export function simplifyFhirpath(node, type = null) {
       const literalValue = node.children[0].terminalNodeText[0].replace(/'/g, '')
       return [{ literal: literalValue }]
     case 'ThisInvocation':
-      return [{ context: '$this' }]
+      return [{ context: '$this', type}]
     default:
       console.log(`Unhandled node type: ${node.type}`)
       return []

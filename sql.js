@@ -1,4 +1,4 @@
-import {fpparse} from './simplify'
+import {fpparse} from './simplify.js'
 
 const opName = {
   '~': 'TILDE',
@@ -18,7 +18,7 @@ function pathToAst(pathArray, parent = null, nameHint = "p") {
   let source
   for (const [i, p] of pathArray.entries()) {
     source = ret.length === 0 ? incomingSource : ret.at(-1).target
-    target =  unique((parent.targetPrefix || source) + "_" +(nameHint) + (i >= 0 ? `_part${i}`: ""));
+    target =  (parent.targetPrefix || source) + "_" +(nameHint) + (i >= 0 ? `_part${i}`: "");
     if (p.literal) {
       ret.push({
         literal: p.literal,
@@ -31,6 +31,7 @@ function pathToAst(pathArray, parent = null, nameHint = "p") {
         context: p.context,
         source,
         target,
+        type: p?.type?.type
       })
     }
     if (p.navigation) {
@@ -39,9 +40,9 @@ function pathToAst(pathArray, parent = null, nameHint = "p") {
           source,
           target,
           jsonPath: `$${expr}`,
-          array: p?.type.array,
+          array: p?.type?.array,
           forEachAnchor: !haveAnchoredForEach,
-          type: p.type.type
+          type: p?.type?.type
         })
       haveAnchoredForEach = true;
       expr = ''
@@ -85,6 +86,7 @@ export function viewDefinitionToQueryAst(viewDefinition) {
     const source = parent?.forEach ? parent?.forEach?.path?.at(-1)?.target : parent.source
     ;(selectBlock.column || []).forEach((column, i) => {
       const path = fpparse(column.path, targetType)
+      console.log("Checking cou", column.name, targetType, path)
       // Append to the selections list in the AST
       parent.column.push({
         name: column.name,
@@ -110,7 +112,7 @@ export function viewDefinitionToQueryAst(viewDefinition) {
   const blockTemplate = {
     ...blockTemplateEmpty(),
     source:  viewDefinition.resource,
-    target:  "result"
+    target:  "r"
   }
   handleSelect(blockTemplate, viewDefinition, viewDefinition.resource)
   return blockTemplate
@@ -129,34 +131,31 @@ function queryPathItemToSql(p, isForEach) {
 
   if (p.op === '~' || p.op === '=') {
     return prerequisites.concat([`${p.target} as (select i.sourceKey, i.key, (i.value=o.value) as value
-      from ${p.args[0].at(-1).target} i join ${p.args[1].at(-1).target} o on (i.key=o.key)
-    )`])
+      from ${p.args[0].at(-1).target} i join ${p.args[1].at(-1).target} o on (i.key=o.key))`])
   }
 
   if (p.op === 'exists') {
     const existsTable = p.args[0].at(-1).target;
     return prerequisites.concat(`${p.target}(sourceKey, key, value) as (
       select  i.sourceKey, i.key, ${p.jsonPath ? `json_extract(i.value, '${p.jsonPath}')` : `i.value`} from ${p.source} i
-      where exists(select 1 from ${existsTable} e where e.key=i.key  and e.value = 1)
-    )`)
+      where exists(select 1 from ${existsTable} e where e.key=i.key  and e.value = 1))`)
   }
 
   if (p.op === 'where') {
     const whereTable = p.args[0].at(-1).target;
-    return prerequisites.concat(`
-     ${p.target}(sourceKey, key, value) as (
+    return prerequisites.concat(`${p.target}(sourceKey, key, value) as (
       select  i.* from ${p.source} i
-      join ${whereTable} o on i.key=o.sourceKey)`)
+      left join ${whereTable} o on i.key=o.sourceKey)`)
   }
 
   // TODO Lots more ops
 
   // Default case: a simple navigation step
   let key, sourceKey;
-  if (p.forEachAnchor) {
-    sourceKey = p.source.includes('_') ? `i.key` : `json_extract(i.value, '$.id')`
+  if (p.forEachAnchor && isForEach) {
+    sourceKey = p.source.includes('_') ? `i.key` : `json_extract(i.value, '$.id') `
   } else {
-    sourceKey = p.source.includes('_') ? "i.sourceKey" : `json_extract(i.value, '$.id')`
+    sourceKey = p.source.includes('_') ? "i.sourceKey" : `json_extract(i.value, '$.id') `
   }
 
   if (p.array) {
@@ -165,9 +164,9 @@ function queryPathItemToSql(p, isForEach) {
     key = "i.key"
   }
 
-  let ret = `${p.target}(sourceKey, key, value) as (select\n    ${sourceKey} as sourceKey,\n    ${key} as key,\n    `
+  let ret = `${p.target}(sourceKey, key, value) as (select\n    ${sourceKey} as sourceKey,\n    ${key} as key,\n   `
   if (p.jsonPath && !p.array) {
-    ret += `json_extract(i.value, '${p.jsonPath}')`
+    ret += `json_extract(i.value, '${p.jsonPath}') `
   } else {
     ret += `o.value `
   }

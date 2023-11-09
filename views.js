@@ -1,19 +1,49 @@
-const vd1 = {
+const vd5 = {
   name: 'patient_demographics',
   resource: 'Patient',
   select: [
    {
-      forEach: "name.where(family.exists($this = 'A'))",
+      forEach: "name",
       column: [
         {
-          path: "family",
-          name: 'patient_family_name',
+          path: "$this.where(family.exists($this = 'A')).use",
+          name: 'use_for_name_a',
         },
       ],
     }, 
   ],
 }
-const vd3 = {
+const vd1 = {
+  name: 'patient_demographics',
+  resource: 'Patient',
+  select: [{
+      forEach: "name",
+      column: [
+        {
+          path: 'family',
+          name: 'patient_family_name',
+        },
+      ],
+      select: [{
+        forEach: "given",
+        column: [{
+          path: '$this',
+          name: 'patient_given'
+        }]
+      }]
+    }, {
+      forEach: "contact.where(name.text='Bob Bogart')",
+      column: [
+        {
+          path: 'name.family',
+          name: 'contact_family_name',
+        },
+      ],
+    }, 
+  ],
+}
+
+const vd2 = {
   name: 'patient_demographics',
   resource: 'Patient',
   select: [
@@ -21,7 +51,7 @@ const vd3 = {
       forEach: "name",
       column: [
         {
-          path: 'name.family',
+          path: 'family',
           name: 'patient_family_name',
         },
       ],
@@ -33,7 +63,7 @@ const vd3 = {
         }]
       }]
     },{
-      forEach: "contact.where(name.text='Josh')",
+      forEach: "contact.where(name.text='Bob Bogart')",
       column: [
         {
           path: 'name.family',
@@ -43,7 +73,7 @@ const vd3 = {
     },
   ],
 }
-const vd2 = {
+const vd3 = {
   name: 'patient_demographics',
   resource: 'Patient',
   select: [

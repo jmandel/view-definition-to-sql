@@ -1,15 +1,5 @@
 import {fpparse} from './simplify'
 
-let counter = {}
-function unique(n) {
-  if (counter[n] !== undefined) {
-    counter[n] += 1;
-  } else {
-    counter[n] = 0
-  }
-  return n + (counter[n] > 0 ? counter[n] : '')
-}
-
 const opName = {
   '~': 'TILDE',
   '=': 'EQ',
@@ -21,9 +11,7 @@ const opName = {
 
 function pathToAst(pathArray, parent = null, nameHint = "p") {
   const ret = []
-
   const incomingSource = parent?.forEach ? parent?.forEach?.path?.at(-1)?.source : parent.source
-  // const target = parent?.forEach ? parent?.forEach?.path?.at(-1)?.target : parent.target
   let haveAnchoredForEach = false; 
   let expr = ''
   let target
@@ -161,6 +149,9 @@ function queryPathItemToSql(p, isForEach) {
       join ${whereTable} o on i.key=o.sourceKey)`)
   }
 
+  // TODO Lots more ops
+
+  // Default case: a simple navigation step
   let key, sourceKey;
   if (p.forEachAnchor) {
     sourceKey = p.source.includes('_') ? `i.key` : `json_extract(i.value, '$.id')`
@@ -208,6 +199,7 @@ export function queryAstToSql(ast) {
   function walkColumns(s) {
     return (s.column || []).concat((s.select || []).flatMap(walkColumns))
   }
+  
   const columns = []
   const joins = []
   for (const c of ast.column || []) {
@@ -228,7 +220,6 @@ export function queryAstToSql(ast) {
   for (const [t, i] of joins.slice(1)) {
     completeSelect += `\n    join ${t} t${i} on (t${i-1}.key=t${i}.key)`
   }
-
   ctes.push( 
     `${ast?.target} as (select t0.sourceKey as key, t0.sourceKey as sourceKey, ${columns.join(", ")} from ${completeSelect})`,
   )

@@ -6,7 +6,7 @@ const vd1= {
       forEach: "name.where(given.exists($this='A2'))",
       column: [
         {
-          path: "name.given.exists($this='A1')",
+          path: "given.exists($this='A1')",
           name: 'also_called_a1',
         },
       ],

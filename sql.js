@@ -12,7 +12,7 @@ const opName = {
 function pathToAst(pathArray, parent = null, nameHint = "p") {
   const ret = []
   const incomingSource = parent?.forEach ? parent?.forEach?.path?.at(-1)?.source : parent.source
-  let haveAnchoredForEach = false; 
+  let haveAnchoredExpression = false; 
   let expr = ''
   let target
   let source
@@ -41,10 +41,10 @@ function pathToAst(pathArray, parent = null, nameHint = "p") {
           target,
           jsonPath: `$${expr}`,
           array: p?.type?.array,
-          forEachAnchor: !haveAnchoredForEach,
+          walkIntoContext: !haveAnchoredExpression,
           type: p?.type?.type
         })
-      haveAnchoredForEach = true;
+      haveAnchoredExpression = true;
       expr = ''
     }
 
@@ -136,27 +136,25 @@ function queryPathItemToSql(p, pathType) {
   if (p.op === 'exists') {
     const existsTable = p.args[0].at(-1).target;
     return prerequisites.concat(`${p.target}(sourceKey, key, value) as (
-      select  i.sourceKey, i.key, 
-      CASE 
-          WHEN o.value IS NOT NULL THEN i.value
-          ELSE NULL
-      END as value
+      select  i.sourceKey, i.sourceKey, 
+      (SELECT CASE WHEN EXISTS (select 1 from ${existsTable} o where o.sourceKey=i.sourceKey and o.value=1) THEN 1 ELSE 0 END) 
       from ${p.source} i
-      left join ${existsTable} o on (i.key=o.key ${pathType==='column' ? "and o.value=1)" : ") where o.value=1"})`)
+      group by i.sourceKey
+      )`)
   }
 
   if (p.op === 'where') {
     const whereTable = p.args[0].at(-1).target;
     return prerequisites.concat(`${p.target}(sourceKey, key, value) as (
       select  i.* from ${p.source} i
-      left join ${whereTable} o on (i.key=o.key ${pathType==='column' ? "and o.value=1)" : ") where o.value=1"})`)
+      left join ${whereTable} o on (i.key=o.sourceKey ${pathType==='column' ? "and o.value=1)" : ") where o.value=1"})`)
   }
 
   // TODO Lots more ops
 
   // Default case: a simple navigation step
   let key, sourceKey;
-  if (p.forEachAnchor && pathType==='forEach') {
+  if (p.walkIntoContext) {
     sourceKey = p.source.includes('_') ? `i.key` : `json_extract(i.value, '$.id') `
   } else {
     sourceKey = p.source.includes('_') ? "i.sourceKey" : `json_extract(i.value, '$.id') `
@@ -218,13 +216,26 @@ export function queryAstToSql(ast) {
     }
   }
 
-  let [t0, i0] = joins[0];
-  let completeSelect = `\n    ${t0} t${i0}`
-  for (const [t, i] of joins.slice(1)) {
-    completeSelect += `\n    join ${t} t${i} on (t${i-1}.key=t${i}.key)`
+ if (ast.forEach) {
+    let [t0, i0] = joins[0];
+    let completeSelect = `${ast.forEach.target} f join \n    ${t0} t${i0} on f.key=t${i0}.sourceKey`
+    for (const [t, i] of joins.slice(1)) {
+      completeSelect += `\n    join ${t} t${i} on (t${i-1}.key=t${i}.key)`
+    }
+    ctes.push( 
+      `${ast?.target} as (select f.sourceKey as key, f.sourceKey as sourceKey, ${columns.join(", ")} from ${completeSelect})`,
+    )
+  } else {
+    let [t0, i0] = joins[0];
+    let completeSelect = `\n    ${t0} t${i0}`
+    for (const [t, i] of joins.slice(1)) {
+      completeSelect += `\n    join ${t} t${i} on (t${i-1}.key=t${i}.key)`
+    }
+    ctes.push( 
+      `${ast?.target} as (select t0.sourceKey as key, t0.sourceKey as sourceKey, ${columns.join(", ")} from ${completeSelect})`,
+    )
+
   }
-  ctes.push( 
-    `${ast?.target} as (select t0.sourceKey as key, t0.sourceKey as sourceKey, ${columns.join(", ")} from ${completeSelect})`,
-  )
+
   return ctes
 }

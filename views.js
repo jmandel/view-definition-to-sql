@@ -1,19 +1,34 @@
-const vd5 = {
+const vd1= {
   name: 'patient_demographics',
   resource: 'Patient',
   select: [
    {
-      forEach: "name",
+      forEach: "name.where(given.exists($this='A2'))",
       column: [
         {
-          path: "$this.where(family.exists($this = 'A')).use",
-          name: 'use_for_name_a',
+          path: "name.given.exists($this='A1')",
+          name: 'also_called_a1',
         },
       ],
     }, 
   ],
 }
-const vd1 = {
+const vd12= {
+  name: 'patient_demographics',
+  resource: 'Patient',
+  select: [
+   {
+      forEach: "name.where(given.exists($this='A2'))",
+      column: [
+        {
+          path: "given.exists($this='A1')",
+          name: 'also_called_a1',
+        },
+      ],
+    }, 
+  ],
+}
+const vdr = {
   name: 'patient_demographics',
   resource: 'Patient',
   select: [{

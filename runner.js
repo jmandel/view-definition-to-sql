@@ -19,7 +19,8 @@ const patients = [{
   "id": "1",
   "name": [
     {"text": "Alice Adams", "given": ["A1", "A2", "A3"], "family": "Adams"},
-    {"text": "Azure Azams", "given": ["A4", "A5"], "family": "A", "use": "preferred"}
+    {"text": "Azure Azams", "given": ["A4", "A2"], "family": "A", "use": "preferred"},
+    {"text": "Azure Azams", "given": ["A4"], "family": "A", "use": "preferred"}
   ],
   "contact":[{
     "name": {"text": "Bob Bogart", "given": ["Bob2", "B2"], "family": "Bogart2"}

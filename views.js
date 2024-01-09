@@ -114,4 +114,4 @@ const vd3 = {
   ],
 }
 
-export {vd1, vd2}
+export {vd1, vd2, vdr}

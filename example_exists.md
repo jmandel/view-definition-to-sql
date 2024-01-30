@@ -1,5 +1,6 @@
 --------Data---------
 
+```json
 [
   {
     "resourceType": "Patient",
@@ -56,8 +57,10 @@
     ]
   }
 ]
+```
 --------View Definition---------
 
+```json
 {
   "name": "patient_demographics",
   "resource": "Patient",
@@ -73,8 +76,10 @@
     }
   ]
 }
+```
 --------AST---------
 
+```json
 {
   "column": [],
   "select": [
@@ -198,7 +203,10 @@
   "source": "Patient",
   "target": "r"
 }
+```
 ----
+
+```sql
  with Patient_r_s0_each_part0(sourceKey, key, value) as (select
     json_extract(i.value, '$.id')  as sourceKey,
     json_extract(i.value, '$.id') || '_' || o.fullkey  as key,
@@ -243,8 +251,10 @@ r as (select t0.sourceKey as key, t0.sourceKey as sourceKey, t0.also_called_a1 a
     r_s0 t0)
 
 select * from r
+```
 ----
 ## Patient_r_s0_each_part0
+
 ```json
 [
   {

@@ -1,4 +1,4 @@
---------Data---------
+# Data
 
 ```json
 [
@@ -58,7 +58,7 @@
   }
 ]
 ```
---------View Definition---------
+# View Definition
 
 ```json
 {
@@ -77,7 +77,8 @@
   ]
 }
 ```
---------AST---------
+
+# AST
 
 ```json
 {
@@ -204,7 +205,8 @@
   "target": "r"
 }
 ```
-----
+
+# SQL
 
 ```sql
  with Patient_r_s0_each_part0(sourceKey, key, value) as (select
